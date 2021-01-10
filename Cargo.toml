@@ -1,0 +1,16 @@
+[package]
+name = "dogs-sop"
+version = "0.1.0"
+authors = ["luc libralesso <libralesso.l@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dogs = "1.0.0"
+bit-set = "0.5.2"
+ordered-float = "2.0.0"
+structopt = { version = "0.3", default-features = false }
+
+[profile.release]
+debug = true # to be removed eventually
