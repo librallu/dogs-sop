@@ -52,9 +52,9 @@ dependencies = [
 
 [[package]]
 name = "dogs"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b6e27fd6c98a13d907bd42fb5483787f366e1955835909a28c882d537577844"
+checksum = "8b33bc544d05ebb4f7f94b18909b5a0e598b6ab38009029800dbaa66e18f5a9a"
 dependencies = [
  "fxhash",
  "human_format",

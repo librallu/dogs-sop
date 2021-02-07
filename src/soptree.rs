@@ -1,5 +1,5 @@
 use bit_set;
-use dogs::searchspace::{SearchSpace, SearchTree, TotalChildrenExpansion, GuidedSpace, PrefixEquivalenceTree};
+use dogs::searchspace::{SearchSpace, SearchTree, TotalChildrenExpansion, PartialChildrenExpansion, GuidedSpace, PrefixEquivalenceTree};
 // use std::cmp::Ordering;
 use ordered_float::OrderedFloat;
 
@@ -11,12 +11,15 @@ pub struct ForwardNode {
     prefix: Vec<u32>,
     added: bit_set::BitSet,
     cost: u32,
+    /// PartialChildrenExpansion pointer
+    pce_pointer: usize,
 }
 
 
 #[derive(Debug)]
 pub struct ForwardSearch {
     inst: sop::Instance,
+    sorted_possible_successors: Vec<Vec<CityId>>,
 }
 
 impl SearchSpace<ForwardNode, Vec<CityId>> for ForwardSearch {
@@ -63,12 +66,45 @@ impl TotalChildrenExpansion<ForwardNode> for ForwardSearch {
     }
 }
 
+
+impl PartialChildrenExpansion<ForwardNode> for ForwardSearch {
+    fn get_next_child(&mut self, n:&mut ForwardNode) -> Option<ForwardNode> {
+        let last_city:u32 = ForwardSearch::get_last_city(n);
+        // for each possible next city
+        let possible_successors:&Vec<CityId> = &self.sorted_possible_successors[last_city as usize];
+        while n.pce_pointer < possible_successors.len() {
+            let successor = possible_successors[n.pce_pointer];
+            n.pce_pointer += 1;
+            // if already added, skip
+            if n.added.contains(successor as usize) {
+                continue;
+            }
+            // check that successor is not a precedence of a not added vertex
+            let mut to_add = true;
+            for e in self.inst.predecessors(&successor).iter() {
+                if !n.added.contains(*e as usize) {
+                    to_add = false;
+                    break;
+                }
+            }
+            if !to_add {
+                continue;
+            }
+            let c = self.add_city(n, successor);
+            return Some(c);
+        }
+        return None;
+    }
+}
+
+
 impl SearchTree<ForwardNode, u32> for ForwardSearch {
     fn root(&mut self) -> ForwardNode {
         let mut res = ForwardNode {
             prefix: Vec::new(),
             added: bit_set::BitSet::new(),
             cost: 0,
+            pce_pointer: 0,
         };
         res.prefix.push(0);
         res.added.insert(0); // add root
@@ -113,13 +149,22 @@ impl PrefixEquivalenceTree<ForwardNode, u32, ForwardNodePE> for ForwardSearch {
 
 impl ForwardSearch {
     pub fn new(filename: &str) -> ForwardSearch {
+        let inst = sop::Instance::new(&filename).unwrap();
+        let mut possible_successors:Vec<Vec<CityId>> = Vec::new();
+        for i in 0..inst.nb_cities() {
+            let mut tmp = inst.possible_successors(&i).clone();
+            tmp.sort_by_key(|a| { inst.cost_arc(i, *a) });
+            possible_successors.push(tmp);
+        }
         ForwardSearch {
-            inst: sop::Instance::new(&filename).unwrap(),
+            inst: inst,
+            sorted_possible_successors: possible_successors,
         }
     }
 
     fn add_city(&self, node: &ForwardNode, i: u32) -> ForwardNode {
         let mut res = node.clone();
+        res.pce_pointer = 0;
         let last = ForwardSearch::get_last_city(node);
         res.cost += self.inst.cost_arc(last, i) as u32;
         res.prefix.push(i);

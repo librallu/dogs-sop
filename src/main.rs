@@ -8,13 +8,12 @@ use dogs::searchspace::SearchSpace;
 
 // load tree search algorithms
 use dogs::treesearch::algo::iterative_beamsearch::IterativeBeamSearch;
-// use dogs::treesearch::algo::dfs::DFS;
+use dogs::treesearch::algo::pce_beamsearch::IterativePCEBeamSearch;
 
 // load Decorators
 use dogs::treesearch::decorators::pe_dominance::PEDominanceTsDecorator;
 use dogs::treesearch::decorators::stats::StatTsDecorator;
 use dogs::treesearch::decorators::pruning::PruningDecorator;
-use dogs::treesearch::decorators::bounding::BoundingDecorator;
 
 // test logger
 use dogs::metriclogger::{MetricLogger};
@@ -26,8 +25,10 @@ mod soptree;
 struct Cli {
     /// path to instance file
     instance: String,
-    /// time for the algorithm to run
+    /// time in seconds for the algorithm to run
     t: f32,
+    /// children expansion type. Values: [total, partial]
+    expansion_type: String,
 }
 
 fn main() {
@@ -41,21 +42,29 @@ fn main() {
     let logger = Rc::new(MetricLogger::new());
 
     // create search space
-    let mut space = BoundingDecorator::new(
-        PEDominanceTsDecorator::new(
-            PruningDecorator::new(
-                StatTsDecorator::new(
-                    soptree::ForwardSearch::new(&args.instance)
-                ).bind_logger(Rc::downgrade(&logger))
-            )
+    let mut space = PEDominanceTsDecorator::new(
+        PruningDecorator::new(
+            StatTsDecorator::new(
+                soptree::ForwardSearch::new(&args.instance)
+            ).bind_logger(Rc::downgrade(&logger))
         )
-    ).bind_logger(Rc::downgrade(&logger));
+    );
+
+    logger.display_headers();
 
     // explore the SOP search tree
-    let mut ts = IterativeBeamSearch::new(&mut space, 1, 2.).bind_logger(Rc::downgrade(&logger));
+    if args.expansion_type == "partial" {
+        let mut ts = IterativePCEBeamSearch::new(&mut space, 1, 2.).bind_logger(Rc::downgrade(&logger));
+        ts.run(|_| start_time.elapsed().unwrap().as_secs_f32() < args.t);
+    } else if args.expansion_type == "total" {
+        let mut ts = IterativeBeamSearch::new(&mut space, 1, 2.).bind_logger(Rc::downgrade(&logger));
+        ts.run(|_| start_time.elapsed().unwrap().as_secs_f32() < args.t);
+    } else {
+        panic!("expansion_type unknown (use --help for more information about the program parameters)");
+    }
 
-    // run the search algorithm and display the results afterwards
-    logger.display_headers();
-    ts.run(|_| start_time.elapsed().unwrap().as_secs_f32() < args.t);
+    // display the results afterwards
     space.display_statistics();
+    
+    
 }
